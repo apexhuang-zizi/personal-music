@@ -1,6 +1,6 @@
 // 个人音乐台 - 试用版
 // 升级时：同时修改 APP_VERSION 与 sw.js 里的 CACHE_VERSION，再重新部署即可。
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.2.0';
 
 const $ = (sel) => document.querySelector(sel);
 const listEl = $('#list');
@@ -9,7 +9,9 @@ const searchEl = $('#search');
 const subEl = $('#filterSub');
 const losslessEl = $('#filterLossless');
 const audio = $('#audio');
-const player = $('#player');
+const discEl = $('#disc');
+const needleEl = $('#needle');
+const badgeEl = $('#nowBadge');
 
 let library = [];          // 清单中的曲目
 let localTracks = [];      // 本地导入的曲目（仅内存）
@@ -51,6 +53,17 @@ function qualityOf(t) {
 
 const QUALITY_LABEL = { lossless: '无损', lossy: '有损', unknown: '未知' };
 
+// ---------- 色相：由曲目 id 决定，让每首歌有自己的背景色调 ----------
+function hueOf(str) {
+  let h = 0;
+  for (const ch of String(str)) h = (h * 31 + ch.codePointAt(0)) % 360;
+  return h;
+}
+
+function setHue(id) {
+  document.documentElement.style.setProperty('--hue', hueOf(id || 'home'));
+}
+
 // ---------- 筛选 ----------
 function currentPool() {
   if (category === 'local') return localTracks;
@@ -78,7 +91,7 @@ function filtered() {
     if (sub && category !== 'local' && t[key] !== sub) return false;
     if (lq && qualityOf(t) !== lq) return false;
     if (q) {
-      const hay = [t.title, t.artist, t.composer, t.genre, t.instrument, t.country]
+      const hay = [t.title, t.artist, t.composer, t.genre, t.instrument, t.country, t.name]
         .filter(Boolean).join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
@@ -127,12 +140,17 @@ function play(id) {
   const t = allTracks().find((x) => x.id === id);
   if (!t) return;
   currentId = id;
+  setHue(id);
   audio.src = t.url || t.objectUrl;
-  audio.play().catch(() => { /* 用户需手动点击播放 */ });
-  player.hidden = false;
+  audio.play().catch(() => { /* 需要用户再点一次播放 */ });
+
   $('#nowTitle').textContent = t.title || t.name;
   const q = qualityOf(t);
-  $('#nowMeta').textContent = [t.artist, t.format, QUALITY_LABEL[q]].filter(Boolean).join(' · ');
+  $('#nowMeta').textContent = [t.artist, t.composer && `作曲 ${t.composer}`, t.era].filter(Boolean).join(' · ') || ' ';
+  badgeEl.hidden = false;
+  badgeEl.className = `badge now-badge ${q}`;
+  badgeEl.textContent = `${QUALITY_LABEL[q]}${t.format ? ' · ' + t.format : ''}`;
+
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: t.title || t.name,
@@ -147,7 +165,16 @@ listEl.addEventListener('click', (e) => {
   if (li) play(li.dataset.id);
 });
 
+// 唱片与唱针跟随播放状态
+function setSpinning(on) {
+  discEl.classList.toggle('playing', on);
+  needleEl.classList.toggle('on', on);
+}
+audio.addEventListener('play', () => setSpinning(true));
+audio.addEventListener('pause', () => setSpinning(false));
+audio.addEventListener('ended', () => setSpinning(false));
 audio.addEventListener('error', () => {
+  setSpinning(false);
   $('#nowMeta').textContent = '播放失败：链接可能失效或当前网络无法访问。';
 });
 
@@ -168,22 +195,20 @@ losslessEl.addEventListener('change', render);
 $('#localFiles').addEventListener('change', (e) => {
   const files = [...e.target.files];
   files.forEach((f, i) => {
+    const q = losslessByName(f.name);
     localTracks.push({
       id: 'local-' + Date.now() + '-' + i,
       name: f.name,
       title: f.name.replace(/\.[^.]+$/, ''),
       objectUrl: URL.createObjectURL(f),
-      lossless: losslessByName(f.name) === 'lossless' ? true
-        : losslessByName(f.name) === 'lossy' ? false : null,
+      lossless: q === 'lossless' ? true : q === 'lossy' ? false : null,
       format: (f.name.split('.').pop() || '').toUpperCase(),
     });
   });
   e.target.value = '';
   if (files.length) {
     category = 'local';
-    document.querySelectorAll('.tab').forEach((b) => b.classList.remove('active'));
-    const localTab = document.querySelector('.tab[data-cat="local"]');
-    if (localTab) localTab.classList.add('active');
+    document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.cat === 'local'));
     render();
   }
 });
