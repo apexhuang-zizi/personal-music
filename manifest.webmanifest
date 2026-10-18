@@ -1,0 +1,14 @@
+{
+  "name": "个人音乐台",
+  "short_name": "音乐台",
+  "description": "个人使用的无损音乐台（试用版）",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#15141a",
+  "theme_color": "#1c1b22",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

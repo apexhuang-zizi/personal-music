@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1c1b22">
+  <meta name="description" content="个人音乐台（试用版）">
+  <title>个人音乐台</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>个人音乐台 <span class="ver" id="appVer"></span></h1>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-cat="instrumental" role="tab">乐器（无词）</button>
+      <button class="tab" data-cat="vocal" role="tab">歌曲（有词）</button>
+      <button class="tab" data-cat="local" role="tab">本地</button>
+    </div>
+    <div class="tools">
+      <input id="search" type="search" placeholder="搜索曲名 / 艺术家 / 作曲">
+      <select id="filterSub"></select>
+      <select id="filterLossless">
+        <option value="">全部音质</option>
+        <option value="lossless">仅无损</option>
+        <option value="lossy">有损</option>
+      </select>
+    </div>
+  </header>
+
+  <main>
+    <p class="status" id="status">加载中…</p>
+    <ul class="list" id="list"></ul>
+
+    <section class="import">
+      <label class="import-btn">
+        导入本地文件（仅本次打开有效）
+        <input id="localFiles" type="file" accept="audio/*,.flac,.wav,.ape,.alac,.mp3,.m4a,.aac,.ogg" multiple hidden>
+      </label>
+      <p class="hint">本地文件不会上传，刷新页面后需要重新导入。无损判断依据文件扩展名（.flac / .wav / .ape / .alac 视为无损；.m4a 无法区分，标为"未知"）。</p>
+    </section>
+  </main>
+
+  <footer class="player" id="player" hidden>
+    <div class="now">
+      <div class="now-title" id="nowTitle">—</div>
+      <div class="now-meta" id="nowMeta"></div>
+    </div>
+    <audio id="audio" controls preload="none"></audio>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
