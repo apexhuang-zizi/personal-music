@@ -40,14 +40,25 @@ ENTRIES = [
     ('hempel-weary-heart-1923', 'hempel-da-205-weary-heart', 'Weary', 'None But the Weary Heart', 'Frieda Hempel', 'Pyotr Ilyich Tchaikovsky', 'vocal', None, '德国', '1923', '古典', PD),
     ('strienz-onegin-1937', 'strienz-onegin', 'Onegin', "Ein jeder kennt die Lieb' auf Erden（《叶甫盖尼·奥涅金》）", 'Wilhelm Strienz', 'Pyotr Ilyich Tchaikovsky', 'vocal', None, '德国', '1937', '歌剧', PD),
     ('stuckgold-amarilli-1923', 'AmarilliMiaBella_201905', 'Amarilli', 'Amarilli mia bella', 'Grete Stückgold', '（待核）', 'vocal', None, '德国', '1923', '古典', PD),
+    # --- 低噪声的现代录音（第 13 项为文件格式，缺省为 flac）---
+    ('chopin-ballade-1-musopen', 'musopen-chopin-complete-works-flac', 'ballade no. 1 in g', 'Ballade No.1 in G minor, Op.23', 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
+    ('chopin-ballade-2-musopen', 'musopen-chopin-complete-works-flac', 'ballade no. 2', 'Ballade No.2 in F major, Op.38', 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
+    ('chopin-etude-waterfall-musopen', 'musopen-chopin-complete-works-flac', 'Waterfall', "Etude Op.10 No.1 'Waterfall'", 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
+    ('chopin-etude-revolutionary-musopen', 'musopen-chopin-complete-works-flac', 'Revolutionary', "Etude Op.10 No.12 'Revolutionary'", 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
+    ('chopin-etude-tristesse-musopen', 'musopen-chopin-complete-works-flac', 'Tristesse', "Etude Op.10 No.3 'Tristesse'", 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
+    ('chopin-etude-arpeggio-musopen', 'musopen-chopin-complete-works-flac', 'Arpeggio', "Etude Op.10 No.11 'Arpeggio'", 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
+    ('beethoven-pastoral-gilanyan-2009', 'karine-gilanyan-beethoven-piano-sonata-nr.-15-in-d-major-op.-28-pastoral', '01 Karine', '钢琴奏鸣曲第15号「田园」Op.28 第一乐章', 'Karine Gilanyan', 'Ludwig van Beethoven', 'instrumental', '钢琴', '德国', '2009', '古典', PD, 'mp3'),
+    ('tchaikovsky-piano-concerto-1-2026', 'tchaikovsky-concerto-1stmvmt', '01 Tchaikovsky', '钢琴协奏曲第1号 Op.23 第一乐章', 'Pianist（待核）', 'Pyotr Ilyich Tchaikovsky', 'instrumental', '钢琴', '俄国', '2026', '古典', CC0, 'mp3'),
 ]
 
 
 def main(out_path):
     out = []
-    for (tid, ident, kw, title, artist, composer, cat, instr, country, era, genre, lic) in ENTRIES:
+    for entry in ENTRIES:
+        tid, ident, kw, title, artist, composer, cat, instr, country, era, genre, lic = entry[:12]
+        ext = entry[12] if len(entry) > 12 else 'flac'
         meta = json.load(urllib.request.urlopen(f'https://archive.org/metadata/{ident}', timeout=60))
-        flacs = [f['name'] for f in meta.get('files', []) if f['name'].lower().endswith('.flac')]
+        flacs = [f['name'] for f in meta.get('files', []) if f['name'].lower().endswith('.' + ext)]
         hits = [n for n in flacs if kw.lower() in n.lower()]
         if not hits:
             sys.exit(f'没有匹配的 FLAC 文件: {tid} ({ident}, 关键词 {kw!r})')
@@ -56,7 +67,7 @@ def main(out_path):
         out.append({
             'id': tid, 'title': title, 'artist': artist, 'composer': composer,
             'category': cat, 'instrument': instr, 'country': country, 'era': era, 'genre': genre,
-            'lossless': True, 'format': 'FLAC', 'license': lic,
+            'lossless': ext == 'flac', 'format': 'FLAC' if ext == 'flac' else 'VBR MP3', 'license': lic,
             'source': f'https://archive.org/details/{ident}', 'url': url,
         })
     data = {'updated': '2026-10-18', 'tracks': out}
