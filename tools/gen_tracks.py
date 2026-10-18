@@ -49,6 +49,26 @@ ENTRIES = [
     ('chopin-etude-arpeggio-musopen', 'musopen-chopin-complete-works-flac', 'Arpeggio', "Etude Op.10 No.11 'Arpeggio'", 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
     ('beethoven-pastoral-gilanyan-2009', 'karine-gilanyan-beethoven-piano-sonata-nr.-15-in-d-major-op.-28-pastoral', '01 Karine', '钢琴奏鸣曲第15号「田园」Op.28 第一乐章', 'Karine Gilanyan', 'Ludwig van Beethoven', 'instrumental', '钢琴', '德国', '2009', '古典', PD, 'mp3'),
     ('tchaikovsky-piano-concerto-1-2026', 'tchaikovsky-concerto-1stmvmt', '01 Tchaikovsky', '钢琴协奏曲第1号 Op.23 第一乐章', 'Pianist（待核）', 'Pyotr Ilyich Tchaikovsky', 'instrumental', '钢琴', '俄国', '2026', '古典', CC0, 'mp3'),
+    # --- Musopen 现代录音（肖邦全集，CC0）---
+    ('chopin-barcarolle-musopen', 'musopen-chopin-complete-works-flac', 'Barcarolle Op. 60', 'Barcarolle Op.60', 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
+    ('chopin-fantaisie-impromptu-musopen', 'musopen-chopin-complete-works-flac', 'Fantaisie - Impromptu', 'Fantaisie-Impromptu Op.66', 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
+    ('chopin-impromptu-1-musopen', 'musopen-chopin-complete-works-flac', 'Impromptu no. 1 in A flat', 'Impromptu No.1 in A-flat major, Op.29', 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
+    ('chopin-berceuse-musopen', 'musopen-chopin-complete-works-flac', 'Berceuse in D-flat', 'Berceuse in D-flat major, Op.57', 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
+    ('chopin-mazurka-op17-4-musopen', 'musopen-chopin-complete-works-flac', 'Mazurka in A minor, Op. 17 no. 4', 'Mazurka in A minor, Op.17 No.4', 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
+    ('chopin-polonaise-brillante-musopen', 'musopen-chopin-complete-works-flac', 'Andante spianato', 'Andante spianato and Grande Polonaise Brillante, Op.22', 'Musopen 录音', 'Frédéric Chopin', 'instrumental', '钢琴', '波兰', '现代录音', '古典', CC0, 'flac'),
+    # --- Musopen 管弦乐 / 室内乐合集（公版）---
+    ('beethoven-eroica-1-musopen', 'MusopenCollectionAsFlac', 'EroicaOp.55-01', '第三交响曲「英雄」Op.55 第一乐章', 'Musopen 管弦乐团', 'Ludwig van Beethoven', 'instrumental', '管弦乐', '德国', '现代录音', '古典', PD, 'flac'),
+    ('beethoven-egmont-musopen', 'MusopenCollectionAsFlac', 'EgmontOverture', '《埃格蒙特》序曲 Op.84', 'Musopen 管弦乐团', 'Ludwig van Beethoven', 'instrumental', '管弦乐', '德国', '现代录音', '古典', PD, 'flac'),
+    ('brahms-symphony-1-musopen', 'MusopenCollectionAsFlac', 'SymphonyNo.1InCMinorOp.68-01', '第一交响曲 C小调 Op.68 第一乐章', 'Musopen 管弦乐团', 'Johannes Brahms', 'instrumental', '管弦乐', '德国', '现代录音', '古典', PD, 'flac'),
+    ('brahms-symphony-4-musopen', 'MusopenCollectionAsFlac', 'SymphonyNo.4InEMinorOp.98-01', '第四交响曲 E小调 Op.98 第一乐章', 'Musopen 管弦乐团', 'Johannes Brahms', 'instrumental', '管弦乐', '德国', '现代录音', '古典', PD, 'flac'),
+    ('mozart-magic-flute-overture-musopen', 'MusopenCollectionAsFlac', 'MagicFluteOverture', '《魔笛》序曲', 'Musopen 管弦乐团', 'Wolfgang Amadeus Mozart', 'instrumental', '管弦乐', '奥地利', '现代录音', '古典', PD, 'flac'),
+    ('mendelssohn-hebrides-musopen', 'MusopenCollectionAsFlac', 'HebridesOverture', '《芬格尔的洞穴》序曲（赫布里底群岛）', 'Musopen 管弦乐团', 'Felix Mendelssohn', 'instrumental', '管弦乐', '德国', '现代录音', '古典', PD, 'flac'),
+    ('mozart-string-quartet-421-musopen', 'MusopenCollectionAsFlac', 'K421-01', '弦乐四重奏 d小调 K.421 第一乐章', 'Musopen 弦乐四重奏', 'Wolfgang Amadeus Mozart', 'instrumental', '弦乐四重奏', '奥地利', '现代录音', '古典', PD, 'flac'),
+    # --- 现代声乐录音（低噪声，MP3）---
+    ('schubert-du-bist-die-ruh-parry-cruwys-2016', 'Episode46DuBistDieRuh', 'du bist die ruh', 'Du bist die Ruh', 'Robert Parry-Cruwys', 'Franz Schubert', 'vocal', None, '英国', '2016', '艺术歌曲', 'CC BY-ND 3.0', 'mp3'),
+    ('schubert-erlkonig-parry-cruwys-2015', 'Episode15DerErlkonig', 'der erlkonig', 'Erlkönig（魔王）', 'Robert Parry-Cruwys', 'Franz Schubert', 'vocal', None, '英国', '2015', '艺术歌曲', 'CC BY-ND 3.0', 'mp3'),
+    ('handel-praise-ye-the-lord-2014', 'PraiseYeTheLord_201408', 'praise ye', 'Praise Ye the Lord', 'Nkunzemnyama（待核）', '（待核）', 'vocal', None, '（待核）', '2014', '宗教', 'Public Domain Mark 1.0（待复核）', 'mp3'),
+    ('malay-rasa-sayang-2015', 'RasaSayangft.L', 'RasaSayang', 'Rasa Sayang', 'zuddox', '马来民歌', 'vocal', None, '马来西亚', '2015', '民歌', CC0, 'mp3'),
 ]
 
 
