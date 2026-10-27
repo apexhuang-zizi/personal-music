@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.8.3';
+const APP_VERSION = '0.8.4';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -654,8 +654,12 @@ async function showWatch(x) {
         </div>
         <p class="w-foot">YouTube 链接可能是预告片或片段；请先确认是否为正版内容。</p>
       </div>` : '';
+    // 数据里没有的片子，也可以在 Tubi 上按片名搜索（网址格式待测试）
+    const tubiSearch = `<div class="w-group"><div class="w-label">搜索</div><div class="w-list">
+      <a class="w-item" href="https://tubitv.com/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener noreferrer">在 Tubi 搜索（待测试）</a>
+    </div></div>`;
     if (!info) {
-      body.innerHTML = `${directHtml}<p class="status">该地区（${esc(region)}）暂无平台数据，可在下方设置中换一个地区。</p>`;
+      body.innerHTML = `${directHtml}<p class="status">该地区（${esc(region)}）暂无平台数据，可在下方设置中换一个地区。</p>${tubiSearch}`;
       return;
     }
     // 平台名称统一链接到 JustWatch 页面（TMDB 不提供每个平台的直达链接）
@@ -671,10 +675,6 @@ async function showWatch(x) {
         <div class="w-label">${LABELS[k]}</div>
         <div class="w-list">${info[k].map(item).join('')}</div>
       </div>`).join('');
-    // 数据里没有的片子，也可以在 Tubi 上按片名搜索（网址格式待测试）
-    const tubiSearch = `<div class="w-group"><div class="w-label">搜索</div><div class="w-list">
-      <a class="w-item" href="https://tubitv.com/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener noreferrer">在 Tubi 搜索（待测试）</a>
-    </div></div>`;
     body.innerHTML = `${directHtml}${groups || '<p class="status">该地区暂无可观看的平台</p>'}${tubiSearch}
       <p class="w-foot">点击平台名称，将打开 TMDB 的观看页面，从那里进入平台观看。地区：${esc(region)} · 数据来自 TMDB（JustWatch）</p>`;
   } catch (err) {

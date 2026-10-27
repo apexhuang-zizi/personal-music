@@ -1,5 +1,5 @@
 // 离线缓存与升级。发布新版本时，把 CACHE_VERSION 加 1（同时更新 app.js 的 APP_VERSION）。
-const CACHE_VERSION = 'v0.8.3';
+const CACHE_VERSION = 'v0.8.4';
 const CACHE_NAME = 'personal-music-' + CACHE_VERSION;
 const SHELL = [
   './',
