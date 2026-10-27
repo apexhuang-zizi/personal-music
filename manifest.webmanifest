@@ -1,6 +1,6 @@
 {
-  "name": "万能搜索",
-  "short_name": "搜索",
+  "name": "Apex's 万能搜索",
+  "short_name": "万能搜索",
   "description": "个人使用的万能搜索（电影、剧集、图片、音乐）",
   "start_url": "./index.html",
   "scope": "./",

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b0a10">
   <meta name="description" content="万能搜索（个人使用）">
-  <title>万能搜索</title>
+  <title>Apex's 万能搜索</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
@@ -26,6 +26,18 @@
     <p class="hint" id="hint">输入关键词开始搜索；"我的曲库"随时可看。</p>
     <div id="sections"></div>
   </main>
+
+  <div class="player" id="player" hidden>
+    <div class="p-head">
+      <div class="p-info">
+        <div class="p-title" id="playerTitle"></div>
+        <div class="p-note" id="playerNote"></div>
+      </div>
+      <button class="p-close" id="playerClose" aria-label="关闭">✕</button>
+    </div>
+    <audio id="playerAudio" controls preload="none" hidden></audio>
+    <video id="playerVideo" controls playsinline preload="none" hidden></video>
+  </div>
 
   <footer class="foot">
     仅供个人使用，不做商用。封面与内容版权归原权利人所有；点击封面将跳转到原始页面。
