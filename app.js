@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.7.0';
+const APP_VERSION = '0.8.0';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -149,13 +149,7 @@ async function fetchTV(q) {
   return (data.results || [])
     .filter((r) => r.poster_path)
     .slice(0, PER_SOURCE)
-    .map((r) => ({
-      cover: `https://image.tmdb.org/t/p/w342${r.poster_path}`,
-      title: r.name || r.original_name,
-      sub: [r.first_air_date?.slice(0, 4), 'TMDB'].filter(Boolean).join(' · '),
-      link: `https://www.themoviedb.org/tv/${r.id}`,
-      tmdb: { kind: 'tv', id: r.id },
-    }));
+    .map((r) => tmdbItem('tv', r, r.name, r.original_name, r.first_air_date));
 }
 
 // 电影（TMDB 部分）：只提供信息和"在哪看"，没有播放
@@ -170,13 +164,59 @@ async function fetchTMDBMovies(q) {
   return (data.results || [])
     .filter((r) => r.poster_path)
     .slice(0, PER_SOURCE)
-    .map((r) => ({
-      cover: `https://image.tmdb.org/t/p/w342${r.poster_path}`,
-      title: r.title || r.original_title,
-      sub: [r.release_date?.slice(0, 4), 'TMDB'].filter(Boolean).join(' · '),
-      link: `https://www.themoviedb.org/movie/${r.id}`,
-      tmdb: { kind: 'movie', id: r.id },
-    }));
+    .map((r) => tmdbItem('movie', r, r.title, r.original_title, r.release_date));
+}
+
+// TMDB 结果统一格式：标题用当前语言，副标题显示英文片名（若不同）、年份
+function tmdbItem(kind, r, title, original, date) {
+  const en = original && original !== title ? original : '';
+  return {
+    cover: `https://image.tmdb.org/t/p/w342${r.poster_path}`,
+    title: title || original,
+    sub: [en, date?.slice(0, 4), 'TMDB'].filter(Boolean).join(' · '),
+    link: `https://www.themoviedb.org/${kind}/${r.id}`,
+    tmdb: { kind, id: r.id },
+  };
+}
+
+// 类型（分类）搜索：输入"西部片"等类型名，列出该类型的主要电影和剧集
+const GENRES = [
+  { names: ['西部片', '西部', 'western'], movie: 37, tv: 37 },
+  { names: ['科幻片', '科幻', 'sci-fi', 'scifi', 'science fiction'], movie: 878, tv: 10765 },
+  { names: ['动作片', '动作', 'action'], movie: 28, tv: 10759 },
+  { names: ['喜剧片', '喜剧', 'comedy'], movie: 35, tv: 35 },
+  { names: ['恐怖片', '恐怖', 'horror'], movie: 27, tv: null },
+  { names: ['爱情片', '爱情', 'romance'], movie: 10749, tv: null },
+  { names: ['剧情片', '剧情', 'drama'], movie: 18, tv: 18 },
+  { names: ['动画片', '动画', 'animation'], movie: 16, tv: 16 },
+  { names: ['悬疑片', '悬疑', '惊悚', 'thriller', 'mystery'], movie: 53, tv: 9648 },
+  { names: ['战争片', '战争', 'war'], movie: 10752, tv: 10768 },
+  { names: ['犯罪片', '犯罪', 'crime'], movie: 80, tv: 80 },
+  { names: ['纪录片', '纪录', 'documentary'], movie: 99, tv: 99 },
+];
+
+function findGenre(q) {
+  const s = q.trim().toLowerCase();
+  return GENRES.find((g) => g.names.includes(s)) || null;
+}
+
+async function fetchGenre(kind, genre) {
+  const id = genre[kind];
+  const key = getTmdbKey();
+  if (!id) return [];
+  if (!key) throw new Error('请先在页面底部设置 TMDB 密钥');
+  const params = new URLSearchParams({
+    api_key: key, with_genres: String(id), sort_by: 'popularity.desc',
+    'vote_count.gte': '100', include_adult: 'false',
+    language: 'zh-CN',
+  });
+  const data = await getJSON(`https://api.themoviedb.org/3/discover/${kind}?${params}`);
+  return (data.results || [])
+    .filter((r) => r.poster_path)
+    .slice(0, PER_SOURCE)
+    .map((r) => kind === 'movie'
+      ? tmdbItem('movie', r, r.title, r.original_title, r.release_date)
+      : tmdbItem('tv', r, r.name, r.original_name, r.first_air_date));
 }
 
 // ---------- "在哪看"：TMDB 提供的各地区正版平台 ----------
@@ -279,6 +319,28 @@ async function runSearch(q) {
   state.status = {};
   SEARCH_KINDS.forEach((k) => { state.status[k] = '搜索中…'; });
   render();
+
+  const genre = findGenre(q);
+  if (genre) {
+    // 类型搜索：只显示该类型的电影和剧集（TMDB）
+    const kinds = ['movie', 'tv'];
+    const settledG = await Promise.allSettled(kinds.map((k) => fetchGenre(k, genre)));
+    if (state.q !== q) return;
+    settledG.forEach((r, i) => {
+      const k = kinds[i];
+      state.results[k] = r.status === 'fulfilled' ? r.value : [];
+      state.status[k] = r.status === 'rejected'
+        ? '暂时不可用：' + (r.reason?.message || '网络错误')
+        : (r.value.length ? null : '没有找到结果（该类型在此来源无数据）');
+    });
+    state.results.image = [];
+    state.status.image = '类型搜索只显示电影和剧集';
+    state.results.music = [];
+    state.status.music = '类型搜索只显示电影和剧集';
+    hintEl.textContent = `类型：${genre.names[0]}（TMDB 热门作品）`;
+    render();
+    return;
+  }
 
   const jobs = {
     movie: async () => {
