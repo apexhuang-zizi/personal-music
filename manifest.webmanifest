@@ -1,7 +1,7 @@
 {
-  "name": "个人音乐台",
-  "short_name": "音乐台",
-  "description": "个人使用的无损音乐台（试用版）",
+  "name": "万能搜索",
+  "short_name": "搜索",
+  "description": "个人使用的万能搜索（电影、剧集、图片、音乐）",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -9,6 +9,11 @@
   "theme_color": "#1c1b22",
   "lang": "zh-CN",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
   ]
 }

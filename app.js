@@ -1,237 +1,322 @@
-// 个人音乐台 - 试用版
-// 升级时：同时修改 APP_VERSION 与 sw.js 里的 CACHE_VERSION，再重新部署即可。
-const APP_VERSION = '0.2.0';
+// 万能搜索（个人使用，不做商用）
+// 数据源均为公开接口，浏览器可直接跨域访问，无需密钥：
+//   电影/剧集：Wikipedia（搜索 + 页面图片）
+//   图片：Openverse（CC 授权图片库）
+//   音乐：iTunes Search（专辑封面）
+//   我的曲库：本地 tracks.json，封面取自 Internet Archive
+// 封面加载失败的地址会记入 localStorage，刷新后不再显示该封面。
+const APP_VERSION = '0.3.0';
+
+const KINDS = [
+  { key: 'all', name: '全部' },
+  { key: 'movie', name: '电影' },
+  { key: 'tv', name: '剧集' },
+  { key: 'image', name: '图片' },
+  { key: 'music', name: '音乐' },
+  { key: 'library', name: '我的曲库' },
+];
+const SEARCH_KINDS = ['movie', 'tv', 'image', 'music'];
+const KIND_NAME = Object.fromEntries(KINDS.map((k) => [k.key, k.name]));
+const PER_SOURCE = 24;
 
 const $ = (sel) => document.querySelector(sel);
-const listEl = $('#list');
-const statusEl = $('#status');
-const searchEl = $('#search');
-const subEl = $('#filterSub');
-const losslessEl = $('#filterLossless');
-const audio = $('#audio');
-const discEl = $('#disc');
-const needleEl = $('#needle');
-const badgeEl = $('#nowBadge');
+const qInput = $('#q');
+const catsEl = $('#cats');
+const sectionsEl = $('#sections');
+const hintEl = $('#hint');
 
-let library = [];          // 清单中的曲目
-let localTracks = [];      // 本地导入的曲目（仅内存）
-let category = 'instrumental';
-let currentId = null;
+const state = {
+  q: '',
+  cat: 'all',
+  results: {},        // kind -> [{cover, title, sub, link}]
+  status: {},         // kind -> 文本或 null
+  library: null,      // 曲库条目（只读一次）
+};
 
 $('#appVer').textContent = 'v' + APP_VERSION;
 
-// ---------- 数据加载 ----------
-async function loadLibrary() {
+// ---------- 失效封面记录（localStorage，可失败） ----------
+const DEAD_KEY = 'deadCovers';
+const MAX_DEAD = 3000;
+
+function loadDead() {
   try {
-    const res = await fetch('tracks.json', { cache: 'no-cache' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    library = data.tracks || [];
-    statusEl.textContent = `清单更新于 ${data.updated}，共 ${library.length} 首`;
-  } catch (err) {
-    statusEl.textContent = '清单加载失败（离线且无缓存？）：' + err.message;
+    return new Set(JSON.parse(localStorage.getItem(DEAD_KEY) || '[]'));
+  } catch (_) {
+    return new Set();
   }
+}
+const deadCovers = loadDead();
+
+function markDead(url) {
+  deadCovers.add(url);
+  try {
+    const arr = [...deadCovers].slice(-MAX_DEAD);
+    localStorage.setItem(DEAD_KEY, JSON.stringify(arr));
+  } catch (_) { /* 无存储权限时，本次会话内仍然隐藏 */ }
+}
+
+// ---------- 数据源 ----------
+const isCJK = (s) => /[㐀-鿿]/.test(s);
+
+async function getJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+// Wikipedia：电影 / 剧集
+async function fetchWiki(q, kind) {
+  const zh = isCJK(q);
+  const lang = zh ? 'zh' : 'en';
+  const suffix = kind === 'movie'
+    ? (zh ? '电影' : 'film')
+    : (zh ? '电视剧' : 'television series');
+  const params = new URLSearchParams({
+    action: 'query', format: 'json', origin: '*',
+    generator: 'search', gsrsearch: `${q} ${suffix}`, gsrlimit: String(PER_SOURCE),
+    prop: 'pageimages|info', piprop: 'thumbnail', pithumbsize: '400', pilicense: 'any',
+    inprop: 'url',
+  });
+  const data = await getJSON(`https://${lang}.wikipedia.org/w/api.php?${params}`);
+  const pages = Object.values(data.query?.pages || {});
+  return pages
+    .filter((p) => p.thumbnail?.source)
+    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+    .map((p) => ({
+      cover: p.thumbnail.source,
+      title: p.title,
+      sub: lang === 'zh' ? '维基百科' : 'Wikipedia',
+      link: p.fullurl,
+    }));
+}
+
+// Wikimedia Commons：图片（多为公版或 CC 授权）
+async function fetchImages(q) {
+  const params = new URLSearchParams({
+    action: 'query', format: 'json', origin: '*',
+    generator: 'search', gsrnamespace: '6', gsrsearch: q, gsrlimit: String(PER_SOURCE),
+    prop: 'imageinfo', iiprop: 'url|mime', iiurlwidth: '400',
+  });
+  const data = await getJSON(`https://commons.wikimedia.org/w/api.php?${params}`);
+  return Object.values(data.query?.pages || {})
+    .map((p) => ({ p, info: p.imageinfo?.[0] }))
+    .filter(({ info }) => info?.thumburl && /^image\//.test(info.mime || ''))
+    .sort((a, b) => (a.p.index ?? 0) - (b.p.index ?? 0))
+    .map(({ p, info }) => ({
+      cover: info.thumburl,
+      title: p.title.replace(/^File:/, '').replace(/\.[a-z]+$/i, ''),
+      sub: 'Wikimedia Commons',
+      link: info.descriptionurl,
+    }));
+}
+
+// iTunes：音乐（专辑封面）
+async function fetchMusic(q) {
+  const params = new URLSearchParams({ term: q, media: 'music', entity: 'song', limit: String(PER_SOURCE) });
+  const data = await getJSON(`https://itunes.apple.com/search?${params}`);
+  return (data.results || [])
+    .filter((r) => r.artworkUrl100)
+    .map((r) => ({
+      cover: r.artworkUrl100.replace('100x100bb', '400x400bb'),
+      title: r.trackName,
+      sub: r.artistName,
+      link: r.trackViewUrl || r.collectionViewUrl,
+    }));
+}
+
+// 我的曲库：本地清单，封面来自 Internet Archive 条目图片
+async function loadLibrary() {
+  if (state.library) return state.library;
+  const data = await getJSON('tracks.json');
+  state.library = (data.tracks || []).map((t) => {
+    const ident = (t.source || '').split('/details/')[1] || '';
+    return {
+      cover: ident ? `https://archive.org/services/img/${ident}` : '',
+      title: t.title,
+      sub: [t.artist, t.category === 'vocal' ? '歌曲' : '乐器'].filter(Boolean).join(' · '),
+      link: t.source,
+      _search: [t.title, t.artist, t.composer, t.instrument, t.country].filter(Boolean).join(' ').toLowerCase(),
+    };
+  }).filter((x) => x.cover && x.link);
+  return state.library;
+}
+
+// ---------- 搜索流程 ----------
+async function runSearch(q) {
+  state.q = q;
+  state.results = {};
+  state.status = {};
+  SEARCH_KINDS.forEach((k) => { state.status[k] = '搜索中…'; });
+  render();
+
+  const jobs = {
+    movie: () => fetchWiki(q, 'movie'),
+    tv: () => fetchWiki(q, 'tv'),
+    image: () => fetchImages(q),
+    music: () => fetchMusic(q),
+  };
+  const entries = Object.entries(jobs);
+  const settled = await Promise.allSettled(entries.map(([, fn]) => fn()));
+  settled.forEach((r, i) => {
+    const kind = entries[i][0];
+    if (state.q !== q) return;           // 已被新的搜索取代
+    if (r.status === 'fulfilled') {
+      state.results[kind] = r.value;
+      state.status[kind] = r.value.length ? null : '没有找到结果';
+    } else {
+      state.results[kind] = [];
+      state.status[kind] = '暂时不可用：' + (r.reason?.message || '网络错误');
+    }
+  });
   render();
 }
 
-// ---------- 无损判断 ----------
-const LOSSLESS_EXT = ['flac', 'wav', 'ape', 'alac', 'aiff', 'aif'];
-const LOSSY_EXT = ['mp3', 'aac', 'ogg', 'opus', 'wma'];
-
-function losslessByName(name) {
-  const ext = (name.split('.').pop() || '').toLowerCase();
-  if (LOSSLESS_EXT.includes(ext)) return 'lossless';
-  if (LOSSY_EXT.includes(ext)) return 'lossy';
-  return 'unknown';
-}
-
-function qualityOf(t) {
-  if (t.lossless === true) return 'lossless';
-  if (t.lossless === false) return 'lossy';
-  return 'unknown';
-}
-
-const QUALITY_LABEL = { lossless: '无损', lossy: '有损', unknown: '未知' };
-
-// ---------- 色相：由曲目 id 决定，让每首歌有自己的背景色调 ----------
-function hueOf(str) {
-  let h = 0;
-  for (const ch of String(str)) h = (h * 31 + ch.codePointAt(0)) % 360;
-  return h;
-}
-
-function setHue(id) {
-  document.documentElement.style.setProperty('--hue', hueOf(id || 'home'));
-}
-
-// ---------- 筛选 ----------
-function currentPool() {
-  if (category === 'local') return localTracks;
-  return library.filter((t) => t.category === category);
-}
-
-function refreshSubOptions() {
-  const pool = currentPool();
-  const key = category === 'instrumental' ? 'instrument' : 'country';
-  const values = [...new Set(pool.map((t) => t[key]).filter(Boolean))].sort();
-  const label = category === 'instrumental' ? '全部乐器' : '全部国家/地区';
-  const prev = subEl.value;
-  subEl.innerHTML = `<option value="">${label}</option>` +
-    values.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
-  if (values.includes(prev)) subEl.value = prev;
-  subEl.hidden = category === 'local';
-}
-
-function filtered() {
-  const q = searchEl.value.trim().toLowerCase();
-  const sub = subEl.value;
-  const lq = losslessEl.value;
-  const key = category === 'instrumental' ? 'instrument' : 'country';
-  return currentPool().filter((t) => {
-    if (sub && category !== 'local' && t[key] !== sub) return false;
-    if (lq && qualityOf(t) !== lq) return false;
-    if (q) {
-      const hay = [t.title, t.artist, t.composer, t.genre, t.instrument, t.country, t.name]
-        .filter(Boolean).join(' ').toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
-}
-
 // ---------- 渲染 ----------
-function render() {
-  refreshSubOptions();
-  const items = filtered();
-  if (category === 'local' && localTracks.length === 0) {
-    listEl.innerHTML = '';
-    statusEl.textContent = '还没有导入本地文件，点击下方"导入本地文件"。';
-    return;
-  }
-  statusEl.textContent = `显示 ${items.length} 首`;
-  listEl.innerHTML = items.map((t) => {
-    const q = qualityOf(t);
-    const sub = category === 'local'
-      ? escapeHtml(t.name)
-      : escapeHtml([t.artist, t.instrument || t.country, t.era].filter(Boolean).join(' · '));
-    const playing = t.id === currentId ? ' playing' : '';
-    return `<li class="item${playing}" data-id="${escapeHtml(t.id)}">
-      <div class="main">
-        <div class="t">${escapeHtml(t.title || t.name)}</div>
-        <div class="s">${sub}</div>
-      </div>
-      <span class="badge ${q}">${QUALITY_LABEL[q]}${t.format ? ' · ' + escapeHtml(t.format) : ''}</span>
-    </li>`;
-  }).join('');
-}
-
-function escapeHtml(s) {
+function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
 }
 
-// ---------- 播放 ----------
-function allTracks() {
-  return [...library, ...localTracks];
+function visibleKinds() {
+  if (state.cat !== 'all') return [state.cat];
+  return [...SEARCH_KINDS, 'library'];
 }
 
-function play(id) {
-  const t = allTracks().find((x) => x.id === id);
-  if (!t) return;
-  currentId = id;
-  setHue(id);
-  audio.src = t.url || t.objectUrl;
-  audio.play().catch(() => { /* 需要用户再点一次播放 */ });
+function itemsFor(kind) {
+  let items;
+  if (kind === 'library') {
+    const all = state.library || [];
+    const q = state.q.trim().toLowerCase();
+    items = q ? all.filter((x) => x._search.includes(q)) : all;
+  } else {
+    items = state.results[kind] || [];
+  }
+  return items.filter((x) => !deadCovers.has(x.cover));   // 刷新后不再显示已失效封面
+}
 
-  $('#nowTitle').textContent = t.title || t.name;
-  const q = qualityOf(t);
-  $('#nowMeta').textContent = [t.artist, t.composer && `作曲 ${t.composer}`, t.era].filter(Boolean).join(' · ') || ' ';
-  badgeEl.hidden = false;
-  badgeEl.className = `badge now-badge ${q}`;
-  badgeEl.textContent = `${QUALITY_LABEL[q]}${t.format ? ' · ' + t.format : ''}`;
+function renderCats() {
+  catsEl.innerHTML = KINDS.map((k) =>
+    `<button class="cat${k.key === state.cat ? ' active' : ''}" data-cat="${k.key}">${esc(k.name)}</button>`
+  ).join('');
+}
 
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: t.title || t.name,
-      artist: t.artist || '',
-    });
+function renderSections() {
+  const kinds = visibleKinds();
+  const parts = [];
+  for (const kind of kinds) {
+    const isLib = kind === 'library';
+    const items = itemsFor(kind);
+    const status = isLib ? (state.library ? null : '读取曲库…') : state.status[kind];
+    let body = '';
+    if (status) body += `<p class="status${status.startsWith('暂时不可用') ? ' err' : ''}">${esc(status)}</p>`;
+    if (!status && items.length === 0) {
+      const msg = isLib && state.q ? '曲库中没有匹配的条目'
+        : state.q ? '暂无可显示的封面'
+        : '输入关键词后显示结果';
+      body += `<p class="status">${msg}</p>`;
+    }
+    const cards = items.map((x) => `
+      <a class="card" href="${esc(x.link)}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">
+        <div class="cover"><img src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-cover="${esc(x.cover)}"></div>
+        <div class="t">${esc(x.title)}</div>
+        <div class="s">${esc(x.sub)}</div>
+      </a>`).join('');
+    parts.push(`
+      <section class="section" data-kind="${kind}">
+        <div class="sec-head">
+          <div class="sec-title">${esc(KIND_NAME[kind])}<span>${items.length ? items.length + ' 项' : ''}</span></div>
+          <button class="more" hidden aria-label="展开或收起">▾</button>
+        </div>
+        ${body}
+        <div class="strip">${cards}</div>
+      </section>`);
+  }
+  sectionsEl.innerHTML = parts.join('');
+  layoutAll();
+}
+
+function render() {
+  renderCats();
+  renderSections();
+  hintEl.textContent = state.q ? `“${state.q}” 的结果` : '输入关键词开始搜索；"我的曲库"随时可看。';
+}
+
+// 两行高度：测量第一张卡片，超过两行才显示展开箭头
+function layoutAll() {
+  document.querySelectorAll('.section').forEach((sec) => {
+    const strip = sec.querySelector('.strip');
+    const btn = sec.querySelector('.more');
+    const first = strip.querySelector('.card');
+    if (!first) { btn.hidden = true; strip.style.maxHeight = ''; return; }
+    const cs = getComputedStyle(strip);
+    const gap = parseFloat(cs.rowGap) || 0;
+    const rowH = first.offsetHeight;
+    const twoRows = Math.round(rowH * 2 + gap);
+    if (!strip.classList.contains('open')) strip.style.maxHeight = twoRows + 'px';
+    const overflow = strip.scrollHeight > twoRows + 2 || strip.classList.contains('open');
+    btn.hidden = !overflow;
+    btn.classList.toggle('open', strip.classList.contains('open'));
+  });
+}
+
+// ---------- 事件 ----------
+$('#searchForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const q = qInput.value.trim();
+  if (!q) return;
+  if (state.cat === 'library') state.cat = 'all';
+  runSearch(q);
+});
+
+catsEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.cat');
+  if (!btn) return;
+  state.cat = btn.dataset.cat;
+  render();
+});
+
+sectionsEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.more');
+  if (!btn) return;
+  const strip = btn.closest('.section').querySelector('.strip');
+  strip.classList.toggle('open');
+  layoutAll();
+});
+
+// 封面加载失败：记录并移除，刷新后不再显示
+sectionsEl.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.dataset.cover) return;
+  markDead(img.dataset.cover);
+  img.closest('.card')?.remove();
+  layoutAll();
+}, true);
+
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(layoutAll, 150);
+});
+
+// ---------- 启动 ----------
+(async () => {
+  renderCats();
+  try {
+    await loadLibrary();
+  } catch (err) {
+    state.library = [];
   }
   render();
-}
+})();
 
-listEl.addEventListener('click', (e) => {
-  const li = e.target.closest('.item');
-  if (li) play(li.dataset.id);
-});
-
-// 唱片与唱针跟随播放状态
-function setSpinning(on) {
-  discEl.classList.toggle('playing', on);
-  needleEl.classList.toggle('on', on);
-}
-audio.addEventListener('play', () => setSpinning(true));
-audio.addEventListener('pause', () => setSpinning(false));
-audio.addEventListener('ended', () => setSpinning(false));
-audio.addEventListener('error', () => {
-  setSpinning(false);
-  $('#nowMeta').textContent = '播放失败：链接可能失效或当前网络无法访问。';
-});
-
-// ---------- 分类与筛选事件 ----------
-document.querySelectorAll('.tab').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    category = btn.dataset.cat;
-    document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b === btn));
-    subEl.value = '';
-    render();
-  });
-});
-searchEl.addEventListener('input', render);
-subEl.addEventListener('change', render);
-losslessEl.addEventListener('change', render);
-
-// ---------- 本地导入 ----------
-$('#localFiles').addEventListener('change', (e) => {
-  const files = [...e.target.files];
-  files.forEach((f, i) => {
-    const q = losslessByName(f.name);
-    localTracks.push({
-      id: 'local-' + Date.now() + '-' + i,
-      name: f.name,
-      title: f.name.replace(/\.[^.]+$/, ''),
-      objectUrl: URL.createObjectURL(f),
-      lossless: q === 'lossless' ? true : q === 'lossy' ? false : null,
-      format: (f.name.split('.').pop() || '').toUpperCase(),
-    });
-  });
-  e.target.value = '';
-  if (files.length) {
-    category = 'local';
-    document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.cat === 'local'));
-    render();
-  }
-});
-
-// ---------- 服务端缓存（离线 + 升级） ----------
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').then((reg) => {
-      reg.addEventListener('updatefound', () => {
-        const sw = reg.installing;
-        sw && sw.addEventListener('statechange', () => {
-          if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-            statusEl.textContent = '发现新版本，正在更新…';
-          }
-        });
-      });
-    }).catch(() => { /* 非 HTTPS 或本地 file:// 时不注册 */ });
-    // 新 SW 接管后刷新一次，让新页面生效
+    navigator.serviceWorker.register('sw.js').catch(() => { /* 非 HTTPS 时不注册 */ });
     let reloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!reloaded) { reloaded = true; location.reload(); }
     });
   });
 }
-
-loadLibrary();
