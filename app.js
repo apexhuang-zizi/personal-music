@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.6.2';
+const APP_VERSION = '0.7.0';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -518,8 +518,24 @@ sectionsEl.addEventListener('click', (e) => {
 
 $('#playerClose').addEventListener('click', closePlayer);
 
+// ---------- 直连：通过 Wikidata 找到 Tubi 与 YouTube 的编号 ----------
+// Tubi 网址格式未在本机核实（Tubi 在欧洲不可用），因此标注为"待测试"
+async function fetchDirect(kind, tmdbId) {
+  const tmdbProp = kind === 'movie' ? 'P4947' : 'P4983';
+  const tubiProp = kind === 'movie' ? 'P7760' : 'P7761';
+  const sparql = `SELECT ?tubi ?yt WHERE { ?item wdt:${tmdbProp} "${tmdbId}" . OPTIONAL { ?item wdt:${tubiProp} ?tubi } OPTIONAL { ?item wdt:P1651 ?yt } } LIMIT 20`;
+  const data = await getJSON(`https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`);
+  const rows = data.results?.bindings || [];
+  const tubi = [...new Set(rows.map((r) => r.tubi?.value).filter(Boolean))];
+  const yt = [...new Set(rows.map((r) => r.yt?.value).filter(Boolean))];
+  return {
+    tubi: tubi[0] ? `https://tubitv.com/${kind === 'movie' ? 'movies' : 'series'}/${tubi[0]}` : '',
+    yt: yt.slice(0, 5).map((id) => `https://www.youtube.com/watch?v=${id}`),
+  };
+}
+
 // "在哪看"面板
-const LABELS = { flatrate: '订阅', free: '免费', ads: '含广告免费', rent: '租借', buy: '购买' };
+const LABELS ={ flatrate: '订阅', free: '免费', ads: '含广告免费', rent: '租借', buy: '购买' };
 const LOGO = (p) => p.logo_path ? `https://image.tmdb.org/t/p/w92${p.logo_path}` : '';
 
 async function showWatch(x) {
@@ -529,9 +545,22 @@ async function showWatch(x) {
   body.innerHTML = '<p class="status">正在查询…</p>';
   watchEl.hidden = false;
   try {
-    const { region, info } = await fetchProviders(x.tmdb.kind, x.tmdb.id);
+    const [{ region, info }, direct] = await Promise.all([
+      fetchProviders(x.tmdb.kind, x.tmdb.id),
+      fetchDirect(x.tmdb.kind, x.tmdb.id).catch(() => ({ tubi: '', yt: [] })),
+    ]);
+    // 直连区域（Tubi 待测试；YouTube 为视频页，可能是预告片）
+    const directHtml = (direct.tubi || direct.yt.length) ? `
+      <div class="w-group">
+        <div class="w-label">直连观看</div>
+        <div class="w-list">
+          ${direct.tubi ? `<a class="w-item" href="${esc(direct.tubi)}" target="_blank" rel="noopener noreferrer">Tubi（待测试）</a>` : ''}
+          ${direct.yt.map((u, i) => `<a class="w-item" href="${esc(u)}" target="_blank" rel="noopener noreferrer">YouTube 视频 ${i + 1}</a>`).join('')}
+        </div>
+        <p class="w-foot">YouTube 链接可能是预告片或片段；请先确认是否为正版内容。</p>
+      </div>` : '';
     if (!info) {
-      body.innerHTML = `<p class="status">该地区（${esc(region)}）暂无平台数据，可在下方设置中换一个地区。</p>`;
+      body.innerHTML = `${directHtml}<p class="status">该地区（${esc(region)}）暂无平台数据，可在下方设置中换一个地区。</p>`;
       return;
     }
     // 平台名称统一链接到 JustWatch 页面（TMDB 不提供每个平台的直达链接）
@@ -547,7 +576,7 @@ async function showWatch(x) {
         <div class="w-label">${LABELS[k]}</div>
         <div class="w-list">${info[k].map(item).join('')}</div>
       </div>`).join('');
-    body.innerHTML = `${groups || '<p class="status">该地区暂无可观看的平台</p>'}
+    body.innerHTML = `${directHtml}${groups || '<p class="status">该地区暂无可观看的平台</p>'}
       <p class="w-foot">点击平台名称，将打开 TMDB 的观看页面，从那里进入平台观看。地区：${esc(region)} · 数据来自 TMDB（JustWatch）</p>`;
   } catch (err) {
     body.innerHTML = `<p class="status err">${esc(err.message || '查询失败')}</p>`;
