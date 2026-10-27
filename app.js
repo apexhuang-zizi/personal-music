@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.8.1';
+const APP_VERSION = '0.8.2';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -439,7 +439,8 @@ function renderSections() {
         <div class="cover"><img src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-cover="${esc(x.cover)}">${playBtn}${watchBtn}</div>
         <div class="t">${esc(x.title)}</div>
         <div class="s">${esc(x.sub)}</div>
-      </a>${x.en ? `<button class="copy" type="button" data-copy="${esc(x.en)}">复制英文名</button>` : ''}`;
+        ${x.en ? `<button class="copy" type="button" data-copy="${esc(x.en)}">复制英文名</button>` : ''}
+      </a>`;
     }).join('');
     parts.push(`
       <section class="section" data-kind="${kind}">
