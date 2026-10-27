@@ -39,6 +39,17 @@
     <video id="playerVideo" controls playsinline preload="none" hidden></video>
   </div>
 
+  <div class="player watch-panel" id="watch" hidden>
+    <div class="p-head">
+      <div class="p-info">
+        <div class="p-title" id="watchTitle"></div>
+        <div class="p-note">在哪看（正版平台）</div>
+      </div>
+      <button class="p-close" id="watchClose" aria-label="关闭">✕</button>
+    </div>
+    <div id="watchBody"></div>
+  </div>
+
   <footer class="foot">
     仅供个人使用，不做商用。封面与内容版权归原权利人所有；点击封面将跳转到原始页面。
     <span id="appVer"></span>
@@ -46,6 +57,21 @@
     <details class="tmdb">
       <summary>TMDB 密钥设置</summary>
       <p>在 <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer">TMDB 设置页</a> 申请后粘贴到下方。密钥只保存在本机浏览器中，不会上传到仓库。未设置时，剧集分类使用维基百科信息。</p>
+      <div class="tmdb-row">
+        <label class="region">"在哪看"地区
+          <select id="tmdbRegion">
+            <option value="HK">香港 HK</option>
+            <option value="TW">台湾 TW</option>
+            <option value="US">美国 US</option>
+            <option value="GB">英国 GB</option>
+            <option value="JP">日本 JP</option>
+            <option value="KR">韩国 KR</option>
+            <option value="SG">新加坡 SG</option>
+            <option value="CA">加拿大 CA</option>
+            <option value="AU">澳大利亚 AU</option>
+          </select>
+        </label>
+      </div>
       <div class="tmdb-row">
         <input id="tmdbKey" type="password" placeholder="API Key（v3）" autocomplete="off">
         <button id="tmdbSave" type="button">保存</button>

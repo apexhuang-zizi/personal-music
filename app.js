@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.5.0';
+const APP_VERSION = '0.6.0';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -154,7 +154,46 @@ async function fetchTV(q) {
       title: r.name || r.original_name,
       sub: [r.first_air_date?.slice(0, 4), 'TMDB'].filter(Boolean).join(' · '),
       link: `https://www.themoviedb.org/tv/${r.id}`,
+      tmdb: { kind: 'tv', id: r.id },
     }));
+}
+
+// 电影（TMDB 部分）：只提供信息和"在哪看"，没有播放
+async function fetchTMDBMovies(q) {
+  const key = getTmdbKey();
+  if (!key) return [];
+  const params = new URLSearchParams({
+    api_key: key, query: q, include_adult: 'false',
+    language: isCJK(q) ? 'zh-CN' : 'en-US',
+  });
+  const data = await getJSON(`https://api.themoviedb.org/3/search/movie?${params}`);
+  return (data.results || [])
+    .filter((r) => r.poster_path)
+    .slice(0, PER_SOURCE)
+    .map((r) => ({
+      cover: `https://image.tmdb.org/t/p/w342${r.poster_path}`,
+      title: r.title || r.original_title,
+      sub: [r.release_date?.slice(0, 4), 'TMDB'].filter(Boolean).join(' · '),
+      link: `https://www.themoviedb.org/movie/${r.id}`,
+      tmdb: { kind: 'movie', id: r.id },
+    }));
+}
+
+// ---------- "在哪看"：TMDB 提供的各地区正版平台 ----------
+const TMDB_REGION = 'tmdbRegion';
+function getRegion() {
+  try { return localStorage.getItem(TMDB_REGION) || 'HK'; } catch (_) { return 'HK'; }
+}
+function setRegion(v) {
+  try { localStorage.setItem(TMDB_REGION, v); } catch (_) { /* 忽略 */ }
+}
+
+async function fetchProviders(kind, id) {
+  const key = getTmdbKey();
+  if (!key) throw new Error('请先在页面底部设置 TMDB 密钥');
+  const data = await getJSON(`https://api.themoviedb.org/3/${kind}/${id}/watch/providers?api_key=${encodeURIComponent(key)}`);
+  const region = getRegion();
+  return { region, info: data.results?.[region] || null };
 }
 
 // 剧集：Wikipedia（无 TMDB 密钥时的备用来源，仅信息）
@@ -242,7 +281,14 @@ async function runSearch(q) {
   render();
 
   const jobs = {
-    movie: () => fetchMovies(q),
+    movie: async () => {
+      // 公版可播放的电影 + TMDB 的电影信息（后者只有"在哪看"）
+      const [playable, info] = await Promise.allSettled([fetchMovies(q), fetchTMDBMovies(q)]);
+      const a = playable.status === 'fulfilled' ? playable.value : [];
+      const b = info.status === 'fulfilled' ? info.value : [];
+      if (playable.status === 'rejected' && info.status === 'rejected') throw playable.reason;
+      return [...a, ...b];
+    },
     tv: () => fetchTV(q),
     image: () => fetchImages(q),
     music: () => fetchMusic(q),
@@ -322,9 +368,11 @@ function renderSections() {
       playStore.set(key, x);
       const playBtn = x.play
         ? `<button class="play" data-key="${esc(key)}" aria-label="播放">▶</button>` : '';
+      const watchBtn = x.tmdb
+        ? `<button class="watch" data-key="${esc(key)}" aria-label="在哪看">在哪看</button>` : '';
       return `
       <a class="card" href="${esc(x.link)}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">
-        <div class="cover"><img src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-cover="${esc(x.cover)}">${playBtn}</div>
+        <div class="cover"><img src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-cover="${esc(x.cover)}">${playBtn}${watchBtn}</div>
         <div class="t">${esc(x.title)}</div>
         <div class="s">${esc(x.sub)}</div>
       </a>`;
@@ -438,6 +486,14 @@ catsEl.addEventListener('click', (e) => {
 });
 
 sectionsEl.addEventListener('click', (e) => {
+  const watchBtn = e.target.closest('.watch');
+  if (watchBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const x = playStore.get(watchBtn.dataset.key);
+    if (x?.tmdb) showWatch(x);
+    return;
+  }
   const playBtn = e.target.closest('.play');
   if (playBtn) {
     e.preventDefault();          // 不打开链接，只播放
@@ -455,6 +511,47 @@ sectionsEl.addEventListener('click', (e) => {
 });
 
 $('#playerClose').addEventListener('click', closePlayer);
+
+// "在哪看"面板
+const LABELS = { flatrate: '订阅', free: '免费', ads: '含广告免费', rent: '租借', buy: '购买' };
+const LOGO = (p) => p.logo_path ? `https://image.tmdb.org/t/p/w92${p.logo_path}` : '';
+
+async function showWatch(x) {
+  const watchEl = $('#watch');
+  const body = $('#watchBody');
+  $('#watchTitle').textContent = x.title;
+  body.innerHTML = '<p class="status">正在查询…</p>';
+  watchEl.hidden = false;
+  try {
+    const { region, info } = await fetchProviders(x.tmdb.kind, x.tmdb.id);
+    if (!info) {
+      body.innerHTML = `<p class="status">该地区（${esc(region)}）暂无平台数据，可在下方设置中换一个地区。</p>`;
+      return;
+    }
+    const groups = Object.keys(LABELS).filter((k) => info[k]?.length).map((k) => `
+      <div class="w-group">
+        <div class="w-label">${LABELS[k]}</div>
+        <div class="w-list">${info[k].map((p) => `
+          <span class="w-item">${LOGO(p) ? `<img src="${LOGO(p)}" alt="" referrerpolicy="no-referrer">` : ''}${esc(p.provider_name)}</span>`).join('')}
+        </div>
+      </div>`).join('');
+    body.innerHTML = `${groups || '<p class="status">该地区暂无可观看的平台</p>'}
+      <p class="w-foot">地区：${esc(region)} · 数据来自 TMDB（JustWatch）
+      ${info.link ? `· <a href="${esc(info.link)}" target="_blank" rel="noopener noreferrer">查看完整列表</a>` : ''}</p>`;
+  } catch (err) {
+    body.innerHTML = `<p class="status err">${esc(err.message || '查询失败')}</p>`;
+  }
+}
+
+$('#watchClose').addEventListener('click', () => { $('#watch').hidden = true; });
+
+// 地区设置
+const regionSel = $('#tmdbRegion');
+regionSel.value = getRegion();
+regionSel.addEventListener('change', () => {
+  setRegion(regionSel.value);
+  hintEl.textContent = `"在哪看"地区已设为 ${regionSel.value}`;
+});
 
 // TMDB 密钥设置（仅保存在本机）
 const tmdbInput = $('#tmdbKey');

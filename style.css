@@ -152,7 +152,36 @@ main { max-width: 880px; margin: 0 auto; padding: 14px 16px 40px; }
 .foot details.tmdb summary { cursor: pointer; color: var(--accent); }
 .foot details.tmdb p { margin: 8px 0; }
 .foot details.tmdb a { color: var(--accent); }
-.tmdb-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.tmdb-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.region { font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.region select {
+  padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--card); color: var(--fg); font-size: 13px;
+}
+.region select option { color: #111; }
+
+/* "在哪看"按钮与面板 */
+.watch {
+  position: absolute; left: 6px; bottom: 6px;
+  padding: 4px 9px; border-radius: 999px; border: 0;
+  background: rgba(11, 10, 16, .72); color: #fff; font-size: 11px; cursor: pointer;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.watch:hover { background: var(--accent); color: #0b0a10; }
+.watch-panel { max-height: 60vh; overflow-y: auto; }
+.w-group { margin: 10px 0; }
+.w-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.w-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.w-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--card); font-size: 13px;
+}
+.w-item img { width: 18px; height: 18px; border-radius: 4px; }
+.w-foot { font-size: 11px; color: var(--muted); margin: 10px 0 0; }
+.w-foot a { color: var(--accent); }
+.watch-panel .status { color: var(--muted); font-size: 13px; }
+.watch-panel .status.err { color: #f0a0a0; }
 .tmdb-row input {
   flex: 1 1 200px; min-width: 0; padding: 8px 10px; border-radius: 8px;
   border: 1px solid var(--line); background: var(--card); color: var(--fg); font-size: 13px;
