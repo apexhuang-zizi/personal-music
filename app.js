@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.4.1';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -76,17 +76,47 @@ const cleanTerm = (s) => s.replace(/[():"\\[\]{}^~*?!+\-/]/g, ' ').replace(/\s+/
 
 // ---------- 数据源 ----------
 
+// 中文片名 -> 英文片名：先在中文维基搜索，再取各条目的英文页面标题
+async function zhToEnTitles(q) {
+  const search = new URLSearchParams({
+    action: 'query', format: 'json', origin: '*', list: 'search',
+    srsearch: `${q} 电影`, srlimit: '3',
+  });
+  const s = await getJSON(`https://zh.wikipedia.org/w/api.php?${search}`);
+  const titles = (s.query?.search || []).map((h) => h.title);
+  if (!titles.length) return [];
+  const links = new URLSearchParams({
+    action: 'query', format: 'json', origin: '*', prop: 'langlinks',
+    lllang: 'en', titles: titles.join('|'),
+  });
+  const p = await getJSON(`https://zh.wikipedia.org/w/api.php?${links}`);
+  const en = Object.values(p.query?.pages || {})
+    .flatMap((pg) => (pg.langlinks || []).map((l) => l['*']));
+  return [...new Set(en)];
+}
+
 // 电影：Archive 公版剧情片合集，播放时再去取可播放的文件
 async function fetchMovies(q) {
-  const term = cleanTerm(q);
-  if (!term) return [];
-  const params = new URLSearchParams();
-  params.set('q', `collection:feature_films AND mediatype:movies AND title:(${term})`);
-  ['identifier', 'title', 'date'].forEach((f) => params.append('fl[]', f));
-  params.set('rows', String(PER_SOURCE));
-  params.set('output', 'json');
-  const data = await getJSON(`https://archive.org/advancedsearch.php?${params}`);
-  return (data.response?.docs || []).map((d) => ({
+  let names = [q];
+  if (isCJK(q)) {
+    names = await zhToEnTitles(q);      // 中文片名先转英文，Archive 元数据是英文的
+    if (!names.length) return [];
+  }
+  // 每个片名单独查询再合并（多个片名用 OR 合并时，Archive 会返回空结果）
+  const terms = names.map(cleanTerm).filter(Boolean);
+  if (!terms.length) return [];
+  const docsLists = await Promise.all(terms.map(async (term) => {
+    const params = new URLSearchParams();
+    params.set('q', `collection:feature_films AND mediatype:movies AND title:(${term})`);
+    ['identifier', 'title', 'date'].forEach((f) => params.append('fl[]', f));
+    params.set('rows', String(PER_SOURCE));
+    params.set('output', 'json');
+    const data = await getJSON(`https://archive.org/advancedsearch.php?${params}`);
+    return data.response?.docs || [];
+  }));
+  const seen = new Set();
+  const docs = docsLists.flat().filter((d) => (seen.has(d.identifier) ? false : seen.add(d.identifier)));
+  return docs.slice(0, PER_SOURCE).map((d) => ({
     cover: `https://archive.org/services/img/${d.identifier}`,
     title: d.title || d.identifier,
     sub: d.date ? String(d.date).slice(0, 4) + ' · 公版电影' : '公版电影',
