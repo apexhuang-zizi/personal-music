@@ -65,7 +65,8 @@ body {
 
 /* 内容 */
 main { max-width: 880px; margin: 0 auto; padding: 14px 16px 40px; }
-.hint { color: var(--muted); font-size: 13px; margin: 8px 4px 16px; }
+.hint { color: var(--muted); font-size: 13px; margin: 8px 4px 16px; line-height: 1.6; }
+.hint a { color: var(--accent); }
 
 .section { margin: 0 0 26px; }
 .sec-head {

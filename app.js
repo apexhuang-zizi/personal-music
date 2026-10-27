@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.6.1';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -394,7 +394,13 @@ function renderSections() {
 function render() {
   renderCats();
   renderSections();
-  hintEl.textContent = state.q ? `“${state.q}” 的结果` : '输入关键词开始搜索；"我的曲库"随时可看。';
+  if (state.q) {
+    // 只是跳转到 YouTube 自己的搜索页，不嵌入、不自动播放
+    const yt = `https://www.youtube.com/results?search_query=${encodeURIComponent(state.q)}`;
+    hintEl.innerHTML = `“${esc(state.q)}” 的结果 · <a href="${esc(yt)}" target="_blank" rel="noopener noreferrer">在 YouTube 搜索</a>（结果可能包含非官方上传，请优先选择官方频道）`;
+  } else {
+    hintEl.textContent = '输入关键词开始搜索；"我的曲库"随时可看。';
+  }
 }
 
 // 两行高度：测量第一张卡片，超过两行才显示展开箭头
