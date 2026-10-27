@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.8.0';
+const APP_VERSION = '0.8.1';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -117,6 +117,7 @@ async function fetchMovies(q) {
   const seen = new Set();
   const docs = docsLists.flat().filter((d) => (seen.has(d.identifier) ? false : seen.add(d.identifier)));
   return docs.slice(0, PER_SOURCE).map((d) => ({
+    en: d.title || d.identifier,
     cover: `https://archive.org/services/img/${d.identifier}`,
     title: d.title || d.identifier,
     sub: d.date ? String(d.date).slice(0, 4) + ' · 公版电影' : '公版电影',
@@ -176,6 +177,7 @@ function tmdbItem(kind, r, title, original, date) {
     sub: [en, date?.slice(0, 4), 'TMDB'].filter(Boolean).join(' · '),
     link: `https://www.themoviedb.org/${kind}/${r.id}`,
     tmdb: { kind, id: r.id },
+    en: original || title || '',
   };
 }
 
@@ -437,7 +439,7 @@ function renderSections() {
         <div class="cover"><img src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-cover="${esc(x.cover)}">${playBtn}${watchBtn}</div>
         <div class="t">${esc(x.title)}</div>
         <div class="s">${esc(x.sub)}</div>
-      </a>`;
+      </a>${x.en ? `<button class="copy" type="button" data-copy="${esc(x.en)}">复制英文名</button>` : ''}`;
     }).join('');
     parts.push(`
       <section class="section" data-kind="${kind}">
@@ -553,7 +555,37 @@ catsEl.addEventListener('click', (e) => {
   render();
 });
 
-sectionsEl.addEventListener('click', (e) => {
+// 复制英文片名（不打开链接）
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (_) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+}
+
+sectionsEl.addEventListener('click', async (e) => {
+  const copyBtn = e.target.closest('.copy');
+  if (copyBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const ok = await copyText(copyBtn.dataset.copy);
+    const old = copyBtn.textContent;
+    copyBtn.textContent = ok ? '已复制 ✓' : '复制失败';
+    setTimeout(() => { copyBtn.textContent = old; }, 1200);
+    return;
+  }
   const watchBtn = e.target.closest('.watch');
   if (watchBtn) {
     e.preventDefault();
