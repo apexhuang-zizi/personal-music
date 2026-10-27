@@ -179,6 +179,8 @@ main { max-width: 880px; margin: 0 auto; padding: 14px 16px 40px; }
   background: var(--card); font-size: 13px;
 }
 .w-item img { width: 18px; height: 18px; border-radius: 4px; }
+a.w-item { color: var(--fg); text-decoration: none; }
+a.w-item:hover { border-color: var(--accent); }
 .w-foot { font-size: 11px; color: var(--muted); margin: 10px 0 0; }
 .w-foot a { color: var(--accent); }
 .watch-panel .status { color: var(--muted); font-size: 13px; }

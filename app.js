@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.6.1';
+const APP_VERSION = '0.6.2';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -534,16 +534,21 @@ async function showWatch(x) {
       body.innerHTML = `<p class="status">该地区（${esc(region)}）暂无平台数据，可在下方设置中换一个地区。</p>`;
       return;
     }
+    // 平台名称统一链接到 JustWatch 页面（TMDB 不提供每个平台的直达链接）
+    const href = info.link ? esc(info.link) : '';
+    const item = (p) => {
+      const inner = `${LOGO(p) ? `<img src="${LOGO(p)}" alt="" referrerpolicy="no-referrer">` : ''}${esc(p.provider_name)}`;
+      return href
+        ? `<a class="w-item" href="${href}" target="_blank" rel="noopener noreferrer">${inner}</a>`
+        : `<span class="w-item">${inner}</span>`;
+    };
     const groups = Object.keys(LABELS).filter((k) => info[k]?.length).map((k) => `
       <div class="w-group">
         <div class="w-label">${LABELS[k]}</div>
-        <div class="w-list">${info[k].map((p) => `
-          <span class="w-item">${LOGO(p) ? `<img src="${LOGO(p)}" alt="" referrerpolicy="no-referrer">` : ''}${esc(p.provider_name)}</span>`).join('')}
-        </div>
+        <div class="w-list">${info[k].map(item).join('')}</div>
       </div>`).join('');
     body.innerHTML = `${groups || '<p class="status">该地区暂无可观看的平台</p>'}
-      <p class="w-foot">地区：${esc(region)} · 数据来自 TMDB（JustWatch）
-      ${info.link ? `· <a href="${esc(info.link)}" target="_blank" rel="noopener noreferrer">查看完整列表</a>` : ''}</p>`;
+      <p class="w-foot">点击平台名称，将打开 TMDB 的观看页面，从那里进入平台观看。地区：${esc(region)} · 数据来自 TMDB（JustWatch）</p>`;
   } catch (err) {
     body.innerHTML = `<p class="status err">${esc(err.message || '查询失败')}</p>`;
   }
