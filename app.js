@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.8.2';
+const APP_VERSION = '0.8.3';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -671,7 +671,11 @@ async function showWatch(x) {
         <div class="w-label">${LABELS[k]}</div>
         <div class="w-list">${info[k].map(item).join('')}</div>
       </div>`).join('');
-    body.innerHTML = `${directHtml}${groups || '<p class="status">该地区暂无可观看的平台</p>'}
+    // 数据里没有的片子，也可以在 Tubi 上按片名搜索（网址格式待测试）
+    const tubiSearch = `<div class="w-group"><div class="w-label">搜索</div><div class="w-list">
+      <a class="w-item" href="https://tubitv.com/search/${encodeURIComponent(x.title)}" target="_blank" rel="noopener noreferrer">在 Tubi 搜索（待测试）</a>
+    </div></div>`;
+    body.innerHTML = `${directHtml}${groups || '<p class="status">该地区暂无可观看的平台</p>'}${tubiSearch}
       <p class="w-foot">点击平台名称，将打开 TMDB 的观看页面，从那里进入平台观看。地区：${esc(region)} · 数据来自 TMDB（JustWatch）</p>`;
   } catch (err) {
     body.innerHTML = `<p class="status err">${esc(err.message || '查询失败')}</p>`;
