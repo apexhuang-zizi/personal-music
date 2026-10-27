@@ -147,6 +147,20 @@ main { max-width: 880px; margin: 0 auto; padding: 14px 16px 40px; }
   font-size: 12px; color: var(--muted); line-height: 1.7;
 }
 .foot span { display: block; opacity: .7; margin-top: 4px; }
+.foot .tmdb-note { margin: 8px 0 0; font-size: 11px; opacity: .8; }
+.foot details.tmdb { margin-top: 10px; }
+.foot details.tmdb summary { cursor: pointer; color: var(--accent); }
+.foot details.tmdb p { margin: 8px 0; }
+.foot details.tmdb a { color: var(--accent); }
+.tmdb-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.tmdb-row input {
+  flex: 1 1 200px; min-width: 0; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--card); color: var(--fg); font-size: 13px;
+}
+.tmdb-row button {
+  padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--card); color: var(--fg); font-size: 13px; cursor: pointer;
+}
 
 @media (max-width: 520px) {
   :root { --cw: 104px; --gap: 10px; }

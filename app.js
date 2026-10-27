@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.4.1';
+const APP_VERSION = '0.5.0';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -125,7 +125,39 @@ async function fetchMovies(q) {
   }));
 }
 
-// 剧集：Wikipedia（仅信息）
+// TMDB 密钥只保存在本机浏览器中（localStorage），不写入代码
+const TMDB_KEY = 'tmdbKey';
+function getTmdbKey() {
+  try { return localStorage.getItem(TMDB_KEY) || ''; } catch (_) { return ''; }
+}
+function setTmdbKey(v) {
+  try {
+    if (v) localStorage.setItem(TMDB_KEY, v); else localStorage.removeItem(TMDB_KEY);
+  } catch (_) { /* 无存储权限时本次会话内无效 */ }
+}
+
+// 剧集：有 TMDB 密钥时用 TMDB（海报 + 简介，链接到 TMDB 页面），否则用 Wikipedia
+async function fetchTV(q) {
+  const key = getTmdbKey();
+  if (!key) return fetchWiki(q, 'tv');
+  const zh = isCJK(q);
+  const params = new URLSearchParams({
+    api_key: key, query: q, include_adult: 'false',
+    language: zh ? 'zh-CN' : 'en-US',
+  });
+  const data = await getJSON(`https://api.themoviedb.org/3/search/tv?${params}`);
+  return (data.results || [])
+    .filter((r) => r.poster_path)
+    .slice(0, PER_SOURCE)
+    .map((r) => ({
+      cover: `https://image.tmdb.org/t/p/w342${r.poster_path}`,
+      title: r.name || r.original_name,
+      sub: [r.first_air_date?.slice(0, 4), 'TMDB'].filter(Boolean).join(' · '),
+      link: `https://www.themoviedb.org/tv/${r.id}`,
+    }));
+}
+
+// 剧集：Wikipedia（无 TMDB 密钥时的备用来源，仅信息）
 async function fetchWiki(q, kind) {
   const zh = isCJK(q);
   const lang = zh ? 'zh' : 'en';
@@ -211,7 +243,7 @@ async function runSearch(q) {
 
   const jobs = {
     movie: () => fetchMovies(q),
-    tv: () => fetchWiki(q, 'tv'),
+    tv: () => fetchTV(q),
     image: () => fetchImages(q),
     music: () => fetchMusic(q),
   };
@@ -423,6 +455,22 @@ sectionsEl.addEventListener('click', (e) => {
 });
 
 $('#playerClose').addEventListener('click', closePlayer);
+
+// TMDB 密钥设置（仅保存在本机）
+const tmdbInput = $('#tmdbKey');
+tmdbInput.value = getTmdbKey();
+$('#tmdbSave').addEventListener('click', () => {
+  const v = tmdbInput.value.trim();
+  setTmdbKey(v);
+  hintEl.textContent = v ? 'TMDB 密钥已保存（仅在本机浏览器中）' : 'TMDB 密钥已清除';
+  if (state.q) runSearch(state.q);
+});
+$('#tmdbClear').addEventListener('click', () => {
+  tmdbInput.value = '';
+  setTmdbKey('');
+  hintEl.textContent = 'TMDB 密钥已清除';
+  if (state.q) runSearch(state.q);
+});
 
 // 封面加载失败：记录并移除，刷新后不再显示
 sectionsEl.addEventListener('error', (e) => {
