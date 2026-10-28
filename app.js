@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.8.4';
+const APP_VERSION = '0.8.5';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -434,12 +434,13 @@ function renderSections() {
         ? `<button class="play" data-key="${esc(key)}" aria-label="播放">▶</button>` : '';
       const watchBtn = x.tmdb
         ? `<button class="watch" data-key="${esc(key)}" aria-label="在哪看">在哪看</button>` : '';
+      const copyBtn = x.en
+        ? `<button class="copy" type="button" data-copy="${esc(x.en)}" aria-label="复制英文名" title="复制英文名">⧉</button>` : '';
       return `
       <a class="card" href="${esc(x.link)}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">
-        <div class="cover"><img src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-cover="${esc(x.cover)}">${playBtn}${watchBtn}</div>
+        <div class="cover"><img src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-cover="${esc(x.cover)}">${playBtn}${watchBtn}${copyBtn}</div>
         <div class="t">${esc(x.title)}</div>
         <div class="s">${esc(x.sub)}</div>
-        ${x.en ? `<button class="copy" type="button" data-copy="${esc(x.en)}">复制英文名</button>` : ''}
       </a>`;
     }).join('');
     parts.push(`
@@ -583,7 +584,7 @@ sectionsEl.addEventListener('click', async (e) => {
     e.stopPropagation();
     const ok = await copyText(copyBtn.dataset.copy);
     const old = copyBtn.textContent;
-    copyBtn.textContent = ok ? '已复制 ✓' : '复制失败';
+    copyBtn.textContent = ok ? '✓' : '✕';
     setTimeout(() => { copyBtn.textContent = old; }, 1200);
     return;
   }
