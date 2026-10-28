@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.8.5';
+const APP_VERSION = '0.8.6';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -40,6 +40,15 @@ const state = {
 };
 
 $('#appVer').textContent = 'v' + APP_VERSION;
+
+// ---------- 记住上次搜索（localStorage，可失败） ----------
+const LAST_KEY = 'lastSearch';
+function saveLast(q) {
+  try { localStorage.setItem(LAST_KEY, JSON.stringify({ q, cat: state.cat })); } catch (_) { /* 忽略 */ }
+}
+function loadLast() {
+  try { return JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch (_) { return null; }
+}
 
 // ---------- 失效封面记录（localStorage，可失败） ----------
 const DEAD_KEY = 'deadCovers';
@@ -436,9 +445,10 @@ function renderSections() {
         ? `<button class="watch" data-key="${esc(key)}" aria-label="在哪看">在哪看</button>` : '';
       const copyBtn = x.en
         ? `<button class="copy" type="button" data-copy="${esc(x.en)}" aria-label="复制英文名" title="复制英文名">⧉</button>` : '';
+      const posterBtn = `<button class="pcopy" type="button" data-img="${esc(x.cover)}" aria-label="复制海报" title="复制海报图片">🖼</button>`;
       return `
       <a class="card" href="${esc(x.link)}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">
-        <div class="cover"><img src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-cover="${esc(x.cover)}">${playBtn}${watchBtn}${copyBtn}</div>
+        <div class="cover"><img src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-cover="${esc(x.cover)}">${playBtn}${watchBtn}${copyBtn}${posterBtn}</div>
         <div class="t">${esc(x.title)}</div>
         <div class="s">${esc(x.sub)}</div>
       </a>`;
@@ -547,6 +557,7 @@ $('#searchForm').addEventListener('submit', (e) => {
   const q = qInput.value.trim();
   if (!q) return;
   if (state.cat === 'library') state.cat = 'all';
+  saveLast(q);
   runSearch(q);
 });
 
@@ -554,8 +565,30 @@ catsEl.addEventListener('click', (e) => {
   const btn = e.target.closest('.cat');
   if (!btn) return;
   state.cat = btn.dataset.cat;
+  if (state.q) saveLast(state.q);
   render();
 });
+
+// 复制海报图片：取图片数据写入剪贴板（PNG）；跨域拿不到时退回复制图片地址
+async function toPng(blob) {
+  const bmp = await createImageBitmap(blob);
+  const canvas = document.createElement('canvas');
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  canvas.getContext('2d').drawImage(bmp, 0, 0);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('png'))), 'image/png');
+  });
+}
+
+async function copyPoster(url) {
+  const res = await fetch(url, { mode: 'cors', referrerPolicy: 'no-referrer' });
+  if (!res.ok) throw new Error('fetch');
+  let blob = await res.blob();
+  if (blob.type !== 'image/png') blob = await toPng(blob);
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+  return true;
+}
 
 // 复制英文片名（不打开链接）
 async function copyText(text) {
@@ -578,6 +611,17 @@ async function copyText(text) {
 }
 
 sectionsEl.addEventListener('click', async (e) => {
+  const posterBtn = e.target.closest('.pcopy');
+  if (posterBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = posterBtn.dataset.img;
+    let ok = false;
+    try { ok = await copyPoster(url); } catch (_) { ok = await copyText(url); }
+    posterBtn.textContent = ok ? '✓' : '✕';
+    setTimeout(() => { posterBtn.textContent = '🖼'; }, 1200);
+    return;
+  }
   const copyBtn = e.target.closest('.copy');
   if (copyBtn) {
     e.preventDefault();
@@ -726,13 +770,19 @@ window.addEventListener('resize', () => {
 
 // ---------- 启动 ----------
 (async () => {
+  const last = loadLast();
+  if (last && typeof last.q === 'string' && last.q) {
+    qInput.value = last.q;
+    state.cat = last.cat && last.cat !== 'library' ? last.cat : 'all';
+  }
   renderCats();
   try {
     await loadLibrary();
   } catch (err) {
     state.library = [];
   }
-  render();
+  if (last && last.q) runSearch(last.q);
+  else render();
 })();
 
 if ('serviceWorker' in navigator) {
