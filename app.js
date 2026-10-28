@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.8.8';
+const APP_VERSION = '0.8.9';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -445,10 +445,9 @@ function renderSections() {
         ? `<button class="watch" data-key="${esc(key)}" aria-label="在哪看">在哪看</button>` : '';
       const copyBtn = x.en
         ? `<button class="copy" type="button" data-copy="${esc(x.en)}" aria-label="复制英文名" title="复制英文名">⧉</button>` : '';
-      const posterBtn = `<button class="pcopy" type="button" data-img="${esc(x.cover)}" aria-label="复制海报" title="复制海报图片">🖼</button>`;
       return `
       <a class="card" href="${esc(x.link)}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">
-        <div class="cover"><img src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-cover="${esc(x.cover)}">${playBtn}${watchBtn}${copyBtn}${posterBtn}</div>
+        <div class="cover"><img src="${esc(x.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-cover="${esc(x.cover)}">${playBtn}${watchBtn}${copyBtn}</div>
         <div class="t">${esc(x.title)}</div>
         <div class="s">${esc(x.sub)}</div>
       </a>`;
@@ -569,29 +568,6 @@ catsEl.addEventListener('click', (e) => {
   render();
 });
 
-// 复制海报图片：取图片数据写入剪贴板（PNG）；跨域拿不到时退回复制图片地址
-async function toPng(blob) {
-  const bmp = await createImageBitmap(blob);
-  const canvas = document.createElement('canvas');
-  canvas.width = bmp.width;
-  canvas.height = bmp.height;
-  canvas.getContext('2d').drawImage(bmp, 0, 0);
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('png'))), 'image/png');
-  });
-}
-
-// 图片以 Promise 形式交给 ClipboardItem，写入剪贴板的调用在点击手势内同步发起，不会因下载而丢失
-async function copyPoster(url) {
-  const png = fetch(url, { mode: 'cors', referrerPolicy: 'no-referrer' }).then(async (res) => {
-    if (!res.ok) throw new Error('fetch');
-    const blob = await res.blob();
-    return blob.type === 'image/png' ? blob : toPng(blob);
-  });
-  await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
-  return true;
-}
-
 // 复制英文片名（不打开链接）
 async function copyText(text) {
   try {
@@ -613,24 +589,6 @@ async function copyText(text) {
 }
 
 sectionsEl.addEventListener('click', async (e) => {
-  const posterBtn = e.target.closest('.pcopy');
-  if (posterBtn) {
-    e.preventDefault();
-    e.stopPropagation();
-    const url = posterBtn.dataset.img;
-    let mark = '✓';
-    try {
-      await copyPoster(url);
-    } catch (err) {
-      // 图片站不允许跨域读取时，无法把图片本身写入剪贴板：在新标签页打开图片，供长按或右键复制
-      console.warn('copy poster failed', err);
-      window.open(url, '_blank', 'noopener');
-      mark = '↗';
-    }
-    posterBtn.textContent = mark;
-    setTimeout(() => { posterBtn.textContent = '🖼'; }, 1200);
-    return;
-  }
   const copyBtn = e.target.closest('.copy');
   if (copyBtn) {
     e.preventDefault();

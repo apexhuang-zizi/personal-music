@@ -111,16 +111,14 @@ main { max-width: 880px; margin: 0 auto; padding: 14px 16px 40px; }
 .card .s { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 复制英文名按钮（海报右上角图标） */
-.copy, .pcopy {
-  position: absolute; top: 6px;
+.copy {
+  position: absolute; right: 6px; top: 6px;
   width: 30px; height: 30px; border-radius: 50%;
   border: 0; background: rgba(11, 10, 16, .72); color: #fff;
   font-size: 14px; line-height: 1; cursor: pointer; display: grid; place-items: center;
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
-.copy { right: 6px; }
-.pcopy { left: 6px; }
-.copy:hover, .pcopy:hover { background: var(--accent); color: #0b0a10; }
+.copy:hover { background: var(--accent); color: #0b0a10; }
 
 /* 播放按钮（封面左下角） */
 .card .cover { position: relative; }
