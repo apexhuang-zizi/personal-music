@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.8.6';
+const APP_VERSION = '0.8.7';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -616,9 +616,16 @@ sectionsEl.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
     const url = posterBtn.dataset.img;
-    let ok = false;
-    try { ok = await copyPoster(url); } catch (_) { ok = await copyText(url); }
-    posterBtn.textContent = ok ? '✓' : '✕';
+    let mark = '✓';
+    try {
+      await copyPoster(url);
+    } catch (err) {
+      // 图片站不允许跨域读取时，无法把图片本身写入剪贴板：在新标签页打开图片，供长按或右键复制
+      console.warn('copy poster failed', err);
+      window.open(url, '_blank', 'noopener');
+      mark = '↗';
+    }
+    posterBtn.textContent = mark;
     setTimeout(() => { posterBtn.textContent = '🖼'; }, 1200);
     return;
   }
