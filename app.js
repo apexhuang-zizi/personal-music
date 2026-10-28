@@ -6,7 +6,7 @@
 //   音乐：iTunes 搜索（30 秒试听，可在页内播放）
 //   我的曲库：本地 tracks.json（可在页内播放）
 // 封面加载失败的地址会记入 localStorage，刷新后不再显示。
-const APP_VERSION = '0.8.7';
+const APP_VERSION = '0.8.8';
 
 const KINDS = [
   { key: 'all', name: '全部' },
@@ -581,12 +581,14 @@ async function toPng(blob) {
   });
 }
 
+// 图片以 Promise 形式交给 ClipboardItem，写入剪贴板的调用在点击手势内同步发起，不会因下载而丢失
 async function copyPoster(url) {
-  const res = await fetch(url, { mode: 'cors', referrerPolicy: 'no-referrer' });
-  if (!res.ok) throw new Error('fetch');
-  let blob = await res.blob();
-  if (blob.type !== 'image/png') blob = await toPng(blob);
-  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+  const png = fetch(url, { mode: 'cors', referrerPolicy: 'no-referrer' }).then(async (res) => {
+    if (!res.ok) throw new Error('fetch');
+    const blob = await res.blob();
+    return blob.type === 'image/png' ? blob : toPng(blob);
+  });
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
   return true;
 }
 
